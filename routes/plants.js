@@ -13,6 +13,8 @@ const upload = require('../config/multer');
 // Advanced Query Builder utility'sini import ediyoruz
 // Sort, Filter, Pagination özellikleri için
 const queryBuilder = require('../utils/queryBuilder');
+const { populate } = require('../models/Category');
+const Category = require('../models/Category');
 
 // ===== PLANT CRUD İŞLEMLERİ (Create, Read, Update, Delete) =====
 
@@ -50,7 +52,7 @@ router.get('/', async (req, res) => {
             searchFields: ['name','description'],
             
             // Date filtering için hangi field kullanılacak
-            dateField: 'createdAt'
+            dateField: 'createdAt',
         });
         
         // Image URL'lerini data'ya ekliyoruz
@@ -81,13 +83,49 @@ router.get('/', async (req, res) => {
     }
 });
 
+router.get('/plants', async (req, res) => {
+  try {
+    // Eğer category parametresi varsa
+    if (req.query.category) {
+      // Category koleksiyonundan eşleşen kategoriyi bul
+      const categoryDoc = await Category.findOne({ name: req.query.category });
+      if (categoryDoc) {
+        // Eğer filter objesi yoksa oluştur
+        req.query.filter = req.query.filter || {};
+        // categoryId ile filtreye kategori _id'sini ekle
+        req.query.filter.categoryId = categoryDoc._id.toString();
+      }
+      // Category parametresi kullanıldıktan sonra temizlenebilir
+      delete req.query.category;
+    }
+
+    // filter objesi varsa kullan, yoksa boş obje ile sorgula (tüm bitkiler)
+    const filter = req.query.filter || {};
+
+    // Filtreye göre Plants koleksiyonundan veriyi çek
+    const plants = await Plants.find(filter);
+
+    // JSON olarak başarıyla sonucu döndür
+    res.json({
+      success: true,
+      data: plants
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // 2. READ - Tek bitki getir (GET /api/plants/:id)
 // URL Parameters: :id dinamik parametre (örn: /api/plants/123)
 router.get('/:id', async (req, res) => {
     try {
         // req.params.id: URL'den gelen dinamik parametre
         // Plants.findById(): MongoDB'de ID'ye göre tek kayıt bulma
-        const plant = await Plants.findById(req.params.id);
+        const plant = await Plants.findById(req.params.id).populate('categoryId'); // categoryId ile Category modelini populate ediyoruz
         
         // Bitki bulunamadığında kontrol
         if (!plant) {
@@ -116,6 +154,9 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+
+
+
 // 3. CREATE - Yeni bitki oluştur (POST /api/plants)
 // HTTP POST method: Yeni veri oluşturma işlemleri için kullanılır
 // upload.single('image'): 'image' field'ından tek dosya upload'u kabul eder
@@ -140,7 +181,8 @@ router.post('/', upload.single('image'), async (req, res) => {
             // Upload edilen dosyanın sadece filename'ini kaydediyoruz
             // Full path: public/images/filename.jpg
             // Database'de: filename.jpg (public/images prefix'i otomatik eklenir)
-            image: req.file.filename
+            image: req.file.filename,
+            categoryId: req.body.categoryId // Kategori ID'si
         };
         
         // new Plants(): Yeni bitki instance'ı oluştur

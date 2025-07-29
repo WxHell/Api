@@ -5,6 +5,8 @@
 // Bu modül herhangi bir Mongoose model'i ile kullanılabilir
 // Enterprise-level uygulamalarda standart olarak kullanılan yapı
 
+const Category = require("../models/Category");
+
 /**
  * Advanced Query Builder - Gelişmiş Sorgu Oluşturucu
  * 
@@ -191,6 +193,8 @@ const queryBuilder = async (Model, req, options = {}) => {
                 filterObject[dateField].$lte = new Date(req.query.date_to);
             }
         }
+
+        
 
         // ===== 6. POPULATE (İLİŞKİLİ VERİLERİ GETİRME) =====
         // MongoDB populate: İlişkili collection'lardan veri çekme
