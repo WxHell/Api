@@ -116,7 +116,16 @@ const queryBuilder = async (Model, req, options = {}) => {
                 filterToProcess = manualFilter;
             }
         }
+        if(req.query.category){
+          if(!filterToProcess) {
+            filterToProcess = {};
+              console.log(category);
+          } 
+            const categoryId = await Category.findOne({"id":req.query.category});
+            filterObject["category"] = categoryId._id.toString();
+            console.log(filterObject);
 
+        }
         // Filter objesi varsa işleme devam et
         if (filterToProcess && typeof filterToProcess === 'object') {
             Object.keys(filterToProcess).forEach(field => {

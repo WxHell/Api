@@ -19,6 +19,11 @@ const categorySchema = new mongoose.Schema({
         enum: ['active', 'inactive'],
         default: 'active',
     },
+    parent:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'Category',
+        default:null
+    }
 }, {
     timestamps: true 
 });

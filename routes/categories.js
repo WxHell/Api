@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Category = require("../models/Category");
 const upload = require("../config/multer");
-const queryBuilder = require("../utils/queryBuilder");
+const queryBuilder = require("../utils/queryBuilder").default;
 const fs = require("fs");
 const path = require("path");
 const Plants = require("../models/Plants");
@@ -61,9 +61,99 @@ router.get("/most-plants", async (req, res) => {
     });
   }
 });
+router.get("/categories/tree",async (req,res)=>{
+try{
+  const rootName = req.query.root
+  if(!rootName){
+    return res.status(400).json({success:false,message:"root parametresi bulunamadı"});
+  }
+
+  let current = await Category.findOne({name:rootName});
+  if(!current){
+    return res.status(404).json({success:false,message:"Kategori bulunamadı"});
+  }
+
+  const chain = [current.name];
+  
+  while(true){
+    const next = await Category.findOne({parent:current._id});
+    if(!next)break;
+    chain.push(next.name);
+    current = next;
+  
+  }
+  return res.json({success:true,data:chain});
+  
+}catch(error){
+  res.status(500).json({success:false,message:error.message});
+}
+});
+
+
+
+
+router.get("/categories", async (req, res) => {
+  try {
+    const filter = {};
+
+    if (req.query.parent) {
+      const parentCategory = await Category.findOne({ name: req.query.parent });
+      if (parentCategory) {
+        filter.parent = parentCategory._id;
+      } else {
+        return res.json({ success: true, message: "Bulunamadı", data:parentCategory});
+      }
+    }
+
+    // query'ye filter'ı düzgün şekilde ekle
+    req.query.filter = {
+      ...(req.query.filter || {}),
+      ...filter
+    };
+
+    // HATASIZ: req nesnesi doğrudan gönderiliyor
+    const result = await queryBuilder(Category, req, {
+      defaultLimit: 10,
+      maxLimit: 50,
+      defaultSort: 'createdAt',
+      allowedSortFields: ['name', 'createdAt', 'updatedAt'],
+      allowedFilterFields: ['name', 'status', 'parent'],
+      searchFields: ['name', 'description'],
+      dateField: 'createdAt'
+    });
+
+    const dataWithImageUrls = result.data.map(category => ({
+      ...category.toObject ? category.toObject() : category,
+      imageUrl: `${req.protocol}://${req.get('host')}/images/${category.icon}`
+    }));
+
+    res.json({
+      ...result,
+      data: dataWithImageUrls,
+      success: true
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 router.get("/", async (req, res) => {
   try {
+    const filter = {};
+    if(req.query.category){
+      const category = await Category.findOne({name:req.query.category});
+      if(!category){
+        return res.status(404).json({
+          success:false,
+          message:"Kategori bulunamadı",
+        });
+      }
+
+      filter.categoryId=category._id;
+    }
+  
+  
     const result = await queryBuilder(Category, req, {
       defaultLimit: 5,
       maxLimit: 40,
@@ -150,6 +240,7 @@ router.post("/", upload.single("icon"), async (req, res) => {
       description: req.body.description,
       status: req.body.status || "active",
       icon: req.file.filename,
+      parent:req.body.parent || null,
     };
 
     const category = new Category(categoryData);
