@@ -21,6 +21,17 @@ const path = require('path');
 
 // 1. READ - Tüm bitkileri getir, gelişmiş filtreleme ve kategori + alt kategori desteği ile
 router.get('/', async (req, res) => {
+  
+  async function getChildCategories(categoryId) {
+  const children = await Category.find({ parent: categoryId }).select('_id');
+  let allChildIds = children.map(child => child._id);
+
+  for (const child of children) {
+    const grandChildrenIds = await getChildCategories(child._id);
+    allChildIds = allChildIds.concat(grandChildrenIds);
+  }
+  return allChildIds;
+}
   try {
     // const filter = req.query.filter || {};
 
@@ -44,6 +55,7 @@ router.get('/', async (req, res) => {
     // req.query.filter = filter;
 
     // Burada kesinlikle req nesnesini bozma, direkt ver:
+    
     const result = await queryBuilder(Plants, req, {
       defaultLimit: 3,
       maxLimit: 50,
